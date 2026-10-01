@@ -1,6 +1,8 @@
 import {readFile,writeFile,mkdir,cp} from 'node:fs/promises';
+import {build} from 'esbuild';
 await mkdir('public',{recursive:true});await mkdir('templates',{recursive:true});
 await cp('static','public',{recursive:true});await cp('source/brand','public/admin/brand',{recursive:true});
+await build({entryPoints:['static/admin.js'],bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true,outfile:'public/admin.js'});
 let form=await readFile('source/briefing.php','utf8');
 form=form.slice(form.indexOf('<!DOCTYPE html>'));
 form=form.replaceAll('<?= e($clientName) ?>','@@NAME@@').replaceAll('<?= e($clientToken) ?>','@@TOKEN@@');

@@ -36,7 +36,7 @@ let googleAuth,googleSdk;
 async function prepareGoogle(){
   const cfg=await api('config');
   if(!cfg.apiKey)throw Error('Login Google indisponível. Use e-mail e senha.');
-  const [appSdk,authSdk]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js')]);
+  const [appSdk,authSdk]=await Promise.all([import('firebase/app'),import('firebase/auth')]);
   googleSdk=authSdk;
   googleAuth=authSdk.getAuth(appSdk.initializeApp({apiKey:cfg.apiKey,projectId:cfg.projectId,authDomain:cfg.projectId+'.firebaseapp.com'}));
   googleAuth.languageCode='pt-BR';
