@@ -38,9 +38,8 @@ async function prepareGoogle(){
   if(!cfg.apiKey)throw Error('Login Google indisponível. Use e-mail e senha.');
   const [appSdk,authSdk]=await Promise.all([import('firebase/app'),import('firebase/auth')]);
   googleSdk=authSdk;
-  googleAuth=authSdk.getAuth(appSdk.initializeApp({apiKey:cfg.apiKey,projectId:cfg.projectId,authDomain:cfg.projectId+'.firebaseapp.com'}));
+  googleAuth=authSdk.initializeAuth(appSdk.initializeApp({apiKey:cfg.apiKey,projectId:cfg.projectId,authDomain:cfg.projectId+'.firebaseapp.com'}),{persistence:authSdk.inMemoryPersistence});
   googleAuth.languageCode='pt-BR';
-  await authSdk.setPersistence(googleAuth,authSdk.inMemoryPersistence);
   $('googleLogin').disabled=false;
 }
 prepareGoogle().catch(()=>{$('googleLogin').disabled=false;$('googleLogin').title='Se não carregar, use e-mail e senha.';});
@@ -50,7 +49,7 @@ $('googleLogin').onclick=async()=>{
   verifying=true;$('googleLogin').disabled=true;
   try{
     const provider=new googleSdk.GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});
-    const result=await googleSdk.signInWithPopup(googleAuth,provider);
+    const result=await googleSdk.signInWithPopup(googleAuth,provider,googleSdk.browserPopupRedirectResolver);
     idToken=await result.user.getIdToken();
     await loadClients();
     $('loginForm').reset();$('login').hidden=true;$('panel').hidden=false;$('logout').hidden=false;message('');
