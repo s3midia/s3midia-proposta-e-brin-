@@ -10,7 +10,8 @@ verificationButton.type='submit';verificationButton.textContent='Enviar e-mail d
 $('loginForm').append(verificationButton);
 const verificationHint=document.createElement('p');
 verificationHint.textContent='Primeiro acesso? Preencha seu e-mail e senha e clique em Enviar e-mail de verificação. Confirme o link recebido (confira também o spam), volte aqui e clique em Entrar.';
-$('login').append(verificationHint);
+verificationHint.className='verification-hint';
+document.querySelector('.access-panel').append(verificationHint);
 let verifying=false;
 $('loginForm').onsubmit=async e=>{
   if(verifying){e.preventDefault();return;}
@@ -31,6 +32,36 @@ $('loginForm').onsubmit=async e=>{
   finally{verifying=false;verificationButton.disabled=false;}
 };
 $('logout').onclick=()=>location.reload();
+let googleAuth,googleSdk;
+async function prepareGoogle(){
+  const cfg=await api('config');
+  if(!cfg.apiKey)throw Error('Login Google indisponível. Use e-mail e senha.');
+  const [appSdk,authSdk]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js')]);
+  googleSdk=authSdk;
+  googleAuth=authSdk.getAuth(appSdk.initializeApp({apiKey:cfg.apiKey,projectId:cfg.projectId,authDomain:cfg.projectId+'.firebaseapp.com'}));
+  googleAuth.languageCode='pt-BR';
+  await authSdk.setPersistence(googleAuth,authSdk.inMemoryPersistence);
+  $('googleLogin').disabled=false;
+}
+prepareGoogle().catch(()=>{$('googleLogin').disabled=false;$('googleLogin').title='Se não carregar, use e-mail e senha.';});
+$('googleLogin').onclick=async()=>{
+  if(!googleAuth){message('Não foi possível carregar o login Google. Atualize a página ou use e-mail e senha.');return;}
+  if(verifying)return;
+  verifying=true;$('googleLogin').disabled=true;
+  try{
+    const provider=new googleSdk.GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});
+    const result=await googleSdk.signInWithPopup(googleAuth,provider);
+    idToken=await result.user.getIdToken();
+    await loadClients();
+    $('loginForm').reset();$('login').hidden=true;$('panel').hidden=false;$('logout').hidden=false;message('');
+  }catch(error){
+    idToken='';
+    message(error.code==='auth/popup-closed-by-user'?'Login cancelado. Você pode tentar novamente.':error.code==='auth/popup-blocked'?'Permita pop-ups para este site e tente novamente.':error.code==='auth/account-exists-with-different-credential'?'Esta conta já usa outro método. Entre com e-mail e senha.':error.message==='Acesso não autorizado.'?'Esta conta não tem acesso ao painel. Use a conta autorizada da S3 Mídia.':'Não foi possível entrar com Google. Tente novamente ou use e-mail e senha.');
+  }finally{
+    if(googleAuth)await googleSdk.signOut(googleAuth).catch(()=>{});
+    verifying=false;$('googleLogin').disabled=false;
+  }
+};
 async function loadClients(){clients=await api('clients');$('clients').replaceChildren(text('h2','Todos os clientes'));for(const client of clients){const row=document.createElement('article');row.append(text('strong',client.nome),text('p',client.status==='concluido'?'Concluído':'Pendente'));const link=document.createElement('a');link.href='/?c='+client.id;link.textContent='Abrir formulário';link.target='_blank';link.rel='noopener';row.append(link);const copy=text('button','Copiar link');copy.onclick=()=>navigator.clipboard.writeText(location.origin+'/?c='+client.id).then(()=>message('Link copiado')).catch(()=>message(location.origin+'/?c='+client.id));row.append(copy);const view=text('button','Ver respostas');view.onclick=async()=>{try{const responses=await api('responses&id='+client.id);$('responses').hidden=false;$('responses').replaceChildren(text('h2',client.nome));for(const response of responses){$('responses').append(text('h3',response.enviado_em));const dl=document.createElement('dl');for(const [q,a]of Object.entries(response.respostas))dl.append(text('dt',q),text('dd',Array.isArray(a)?a.join(', '):a));$('responses').append(dl);}if(!responses.length)$('responses').append(text('p','Ainda não há respostas.'));}catch(err){message(err.message);}};row.append(view);if(client.status==='concluido'){const reopen=text('button','Reabrir formulário');reopen.onclick=async()=>{try{await api('reopen',{id:client.id});await loadClients();}catch(err){message(err.message);}};row.append(reopen);}$('clients').append(row);}}
 $('clientForm').onsubmit=async e=>{e.preventDefault();try{const {token}=await api('clients',Object.fromEntries(new FormData(e.target)));e.target.reset();await loadClients();message('Link criado: '+location.origin+'/?c='+token);}catch(err){message(err.message);}};
 function area(proposals){$('briefingsView').hidden=proposals;$('proposalsView').hidden=!proposals;$('briefings').setAttribute('aria-pressed',String(!proposals));$('proposals').setAttribute('aria-pressed',String(proposals));}
