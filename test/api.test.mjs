@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import handler from '../api/app.mjs';
+function response(){return{code:200,headers:{},setHeader(k,v){this.headers[k]=v;},status(code){this.code=code;return this;},json(body){this.body=body;return this;},send(body){this.body=body;return this;},redirect(url){this.code=302;this.location=url;return this;}};}
+test('bloqueia acesso não autenticado a clientes e propostas',async()=>{for(const action of ['clients','workspace','responses']){const res=response();await handler({method:'GET',url:'/api/app?action='+action,headers:{}},res);assert.equal(res.code,401);}});
+test('recusa envio de outra origem',async()=>{const res=response();await handler({method:'POST',url:'/api/app?action=submit',headers:{origin:'https://outro.example',host:'painel.example'},body:{}},res);assert.equal(res.code,403);});
+test('recusa token público inválido antes de acessar banco',async()=>{const res=response();await handler({method:'POST',url:'/api/app?action=submit',headers:{},body:{token:'inválido'}},res);assert.equal(res.code,400);});
+test('direciona raiz sem token ao painel',async()=>{const res=response();await handler({method:'GET',url:'/',headers:{}},res);assert.equal(res.location,'/admin/');});
